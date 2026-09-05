@@ -1,70 +1,103 @@
-const express = require('express');
-const cors = require('cors');
-const mysql = require('mysql2');
+const express = require("express");
+const cors = require("cors");
+const mysql = require("mysql2");
 
 const app = express();
+const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
 
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'mon_projet'
+  host: "localhost",
+  user: "root",
+  password: "",
+  database: "mon_projet",
 });
 
 db.connect((err) => {
   if (err) {
-    console.error('MYSQL ERROR:', err);
+    console.error("Erreur MySQL :", err.message);
     return;
   }
 
-  console.log('MySQL connected successfully!');
+  console.log("MySQL connected successfully!");
 });
 
-app.get('/', (req, res) => {
-  res.send('Backend is running');
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Backend de l'application fonctionne correctement 🚀",
+  });
 });
 
-app.get('/declarations', (req, res) => {
-  const sql =
-    'SELECT * FROM declarations ORDER BY id DESC';
+
+app.get("/declarations", (req, res) => {
+  const sql = `
+    SELECT
+      id,
+      area,
+      departement,
+      equipment,
+      description,
+      reason,
+      start,
+      end,
+      targetHours
+    FROM declarations
+    ORDER BY id DESC
+  `;
 
   db.query(sql, (err, results) => {
     if (err) {
-      console.error('SELECT ERROR:', err);
+      console.error("Erreur MySQL :", err);
 
       return res.status(500).json({
         success: false,
-        message: err.message
+        message: "Erreur lors de la récupération des déclarations.",
       });
     }
 
     res.json({
       success: true,
-      data: results
+      declarations: results,
     });
   });
 });
 
-app.post('/declarations', (req, res) => {
-  console.log(
-    'DECLARATION RECEIVED:',
-    req.body
-  );
+
+app.post("/declarations", (req, res) => {
+  console.log("================================");
+  console.log("Nouvelle déclaration reçue :");
+  console.log(req.body);
+  console.log("================================");
 
   const {
     area,
-    departement,
+    department,
+    equipment,
     description,
-    equipement,
     reason,
-    date,
     start,
     end,
-    targetHours
+    targetHours,
   } = req.body;
+
+  if (
+    !area ||
+    !department ||
+    !equipment ||
+    !description ||
+    !reason ||
+    !start ||
+    !end ||
+    targetHours === undefined
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Tous les champs sont obligatoires.",
+    });
+  }
 
   const sql = `
     INSERT INTO declarations
@@ -72,57 +105,52 @@ app.post('/declarations', (req, res) => {
       area,
       departement,
       description,
-      equipement,
+      equipment,
       reason,
-      date,
-      start,
-      end,
-      \`target Hours\`
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  db.query(
-    sql,
-    [
-      area,
-      departement,
-      description,
-      equipement,
-      reason,
-      date,
       start,
       end,
       targetHours
-    ],
-    (err, result) => {
-      if (err) {
-        console.error(
-          'INSERT ERROR:',
-          err
-        );
+    )
+    VALUES (NOW(),?, ?, ?, ?, ?, ?, ?, ?)
+  `;
 
-        return res.status(500).json({
-          success: false,
-          message: err.message
-        });
-      }
+  const values = [
+    area,
+    department,
+    description,
+    equipment,
+    reason,
+    start,
+    end,
+    targetHours,
+  ];
 
-      console.log(
-        'DECLARATION SAVED:',
-        result.insertId
-      );
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Erreur MySQL :", err);
 
-      res.json({
-        success: true,
-        id: result.insertId
+      return res.status(500).json({
+        success: false,
+        message: "Erreur lors de l'enregistrement.",
+        error: err.message,
       });
     }
-  );
+
+    console.log(
+      "Déclaration enregistrée. ID :",
+      result.insertId
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Déclaration enregistrée avec succès.",
+      id: result.insertId,
+    });
+  });
 });
 
-app.listen(3000, '0.0.0.0', () => {
+app.listen(PORT, () => {
   console.log(
-    'Backend running on http://localhost:3000'
+    `Backend running on http://localhost:${PORT}`
   );
 });

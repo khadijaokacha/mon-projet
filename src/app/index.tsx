@@ -1,898 +1,631 @@
-import { useState } from 'react';
-import {
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useState } from "react";
 
-type Declaration = {
-  id: number;
-  area: string;
-  departement: string;
-  description: string;
-  equipement: string;
-  reason: string;
-  date: string;
-  start: string;
-  end: string;
-  targetHours: number;
-};
+export default function Index() {
+  const [area, setArea] = useState("");
+  const [department, setDepartment] = useState("");
+  const [equipment, setEquipment] = useState("");
+  const [description, setDescription] = useState("");
+  const [reason, setReason] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
 
-// بما أنك كتجربي من المتصفح فـ نفس PC ديال الـBackend
-const API_URL = 'http://localhost:3000';
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
-export default function HomeScreen() {
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
+  // =========================
+  // DATE AUTOMATIQUE
+  // =========================
 
-  const [showStartModal, setShowStartModal] = useState(false);
-  const [showEndModal, setShowEndModal] = useState(false);
+  const date = new Date().toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 
-  const [selectedHour, setSelectedHour] = useState('00');
-  const [selectedMinute, setSelectedMinute] = useState('00');
+  // =========================
+  // CALCUL DE LA DURÉE
+  // =========================
 
-  const [area, setArea] = useState('');
-  const [department, setDepartment] = useState('');
-  const [equipment, setEquipment] = useState('');
-  const [description, setDescription] = useState('');
-  const [reason, setReason] = useState('');
-  const [targetHours, setTargetHours] = useState('');
+  const calculateHours = () => {
+    if (!start || !end) {
+      return "0.00";
+    }
 
-  const [message, setMessage] = useState('');
-  const [declarations, setDeclarations] = useState<Declaration[]>([]);
-  const [showDeclarations, setShowDeclarations] = useState(false);
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
 
-  const hours = Array.from({ length: 24 }, (_, i) =>
-    String(i).padStart(2, '0')
-  );
+    let startMinutes = sh * 60 + sm;
+    let endMinutes = eh * 60 + em;
 
-  const minutes = Array.from({ length: 60 }, (_, i) =>
-    String(i).padStart(2, '0')
-  );
+    if (endMinutes < startMinutes) {
+      endMinutes += 24 * 60;
+    }
 
-  const openStartPicker = () => {
-    setSelectedHour('00');
-    setSelectedMinute('00');
-    setShowStartModal(true);
+    return ((endMinutes - startMinutes) / 60).toFixed(2);
   };
 
-  const openEndPicker = () => {
-    setSelectedHour('00');
-    setSelectedMinute('00');
-    setShowEndModal(true);
-  };
+  const targetHours = calculateHours();
 
-  const confirmStart = () => {
-    setStart(`${selectedHour}:${selectedMinute}`);
-    setShowStartModal(false);
-  };
-
-  const confirmEnd = () => {
-    setEnd(`${selectedHour}:${selectedMinute}`);
-    setShowEndModal(false);
-  };
+  // =========================
+  // ENREGISTREMENT
+  // =========================
 
   const handleSubmit = async () => {
+    setMessage("");
+
     if (
+      !area.trim() ||
+      !department.trim() ||
+      !equipment.trim() ||
+      !description.trim() ||
+      !reason.trim() ||
       !start ||
-      !end ||
-      !area ||
-      !department ||
-      !equipment ||
-      !description ||
-      !reason ||
-      !targetHours
+      !end
     ) {
-      setMessage('Please fill in all fields.');
+      setMessage("⚠️ Veuillez remplir tous les champs.");
       return;
     }
 
     try {
-      setMessage('Saving...');
-
-      const response = await fetch(`${API_URL}/declarations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          area: area,
-          departement: department,
-          description: description,
-          equipement: equipment,
-          reason: reason,
-          date: new Date().toISOString().slice(0, 10),
-          start: start,
-          end: end,
-          targetHours: Number(targetHours),
-        }),
-      });
-
-      const data = await response.json();
-
-      console.log('BACKEND RESPONSE:', data);
-
-      if (data.success) {
-        setMessage('Declaration created successfully!');
-
-        setStart('');
-        setEnd('');
-        setArea('');
-        setDepartment('');
-        setEquipment('');
-        setDescription('');
-        setReason('');
-        setTargetHours('');
-      } else {
-        setMessage(
-          data.message || 'Error creating declaration.'
-        );
-      }
-    } catch (error) {
-      console.error('BACKEND ERROR:', error);
-      setMessage('Cannot connect to backend.');
-    }
-  };
-
-  const loadDeclarations = async () => {
-    try {
-      setMessage('Loading declarations...');
+      setLoading(true);
 
       const response = await fetch(
-        `${API_URL}/declarations`
+        "http://localhost:3000/declarations",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            area: area.trim(),
+            department: department.trim(),
+            equipment: equipment.trim(),
+            description: description.trim(),
+            reason: reason.trim(),
+            start,
+            end,
+            targetHours: Number(targetHours),
+          }),
+        }
       );
 
       const data = await response.json();
 
-      console.log('DECLARATIONS:', data);
+      if (response.ok && data.success) {
+        setMessage("✓ Déclaration enregistrée avec succès.");
 
-      if (data.success) {
-        setDeclarations(data.data);
-        setShowDeclarations(true);
-        setMessage('');
+        setArea("");
+        setDepartment("");
+        setEquipment("");
+        setDescription("");
+        setReason("");
+        setStart("");
+        setEnd("");
       } else {
-        setMessage('Error loading declarations.');
+        setMessage(
+          "❌ " +
+            (data.message || "Erreur lors de l'enregistrement.")
+        );
       }
     } catch (error) {
-      console.error('GET ERROR:', error);
-      setMessage('Cannot connect to backend.');
+      console.error(error);
+
+      setMessage("❌ Impossible de contacter le serveur.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const TimePicker = ({
-    visible,
-    title,
-    onConfirm,
-    onCancel,
-  }: {
-    visible: boolean;
-    title: string;
-    onConfirm: () => void;
-    onCancel: () => void;
-  }) => {
-    return (
-      <Modal
-        visible={visible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={onCancel}
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>
-              {title}
-            </Text>
+  // =========================
+  // STYLES
+  // =========================
 
-            <Text style={styles.selectedTime}>
-              {selectedHour}:{selectedMinute}
-            </Text>
+  const inputStyle = {
+    width: "100%",
+    height: "48px",
+    padding: "0 15px",
+    border: "1px solid #dbe3ec",
+    borderRadius: "10px",
+    backgroundColor: "#f8fafc",
+    color: "#172033",
+    fontSize: "15px",
+    boxSizing: "border-box" as const,
+    outline: "none",
+  };
 
-            <View style={styles.pickerContainer}>
-              <View style={styles.column}>
-                <Text style={styles.columnTitle}>
-                  Hour
-                </Text>
+  const labelStyle = {
+    display: "block",
+    marginBottom: "8px",
+    color: "#263449",
+    fontWeight: "600",
+    fontSize: "14px",
+  };
 
-                <ScrollView style={styles.list}>
-                  {hours.map((hour) => (
-                    <TouchableOpacity
-                      key={hour}
-                      style={
-                        selectedHour === hour
-                          ? styles.selectedItem
-                          : styles.timeItem
-                      }
-                      onPress={() =>
-                        setSelectedHour(hour)
-                      }
-                    >
-                      <Text
-                        style={
-                          selectedHour === hour
-                            ? styles.selectedTimeText
-                            : styles.timeText
-                        }
-                      >
-                        {hour}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              <View style={styles.column}>
-                <Text style={styles.columnTitle}>
-                  Minute
-                </Text>
-
-                <ScrollView style={styles.list}>
-                  {minutes.map((minute) => (
-                    <TouchableOpacity
-                      key={minute}
-                      style={
-                        selectedMinute === minute
-                          ? styles.selectedItem
-                          : styles.timeItem
-                      }
-                      onPress={() =>
-                        setSelectedMinute(minute)
-                      }
-                    >
-                      <Text
-                        style={
-                          selectedMinute === minute
-                            ? styles.selectedTimeText
-                            : styles.timeText
-                        }
-                      >
-                        {minute}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={onConfirm}
-            >
-              <Text style={styles.confirmText}>
-                Confirm
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onCancel}
-            >
-              <Text style={styles.cancelText}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
+  const fieldStyle = {
+    marginBottom: "20px",
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(135deg, #eef4ff 0%, #f8fafc 50%, #eef2f7 100%)",
+        boxSizing: "border-box",
+        overflowY: "auto",
+        fontFamily: "Arial, Helvetica, sans-serif",
+      }}
     >
-      <View style={styles.header}>
-        <Text style={styles.headerSmall}>
-          DOWNTIME MANAGEMENT
-        </Text>
+      {/* =========================
+          NOVA TOP BAR
+      ========================= */}
 
-        <Text style={styles.title}>
-          Create Declaration
-        </Text>
+      <div
+        style={{
+          height: "64px",
+          width: "100%",
+          paddingLeft: "24px",
+          paddingRight: "145px",
+          display: "flex",
+          alignItems: "center",
+          boxSizing: "border-box",
+          background:
+            "linear-gradient(90deg, #061735 0%, #082552 55%, #0A2E68 100%)",
+          color: "#ffffff",
+          userSelect: "none",
+          boxShadow: "0 3px 15px rgba(0, 0, 0, 0.18)",
+        }}
+      >
+        {/* LOGO */}
 
-        <Text style={styles.subtitle}>
-          Report and track equipment downtime
-        </Text>
-      </View>
-
-      <View style={styles.formCard}>
-        <Text style={styles.sectionTitle}>
-          Downtime Information
-        </Text>
-
-        <Text style={styles.label}>
-          Start Time
-        </Text>
-
-        <TouchableOpacity
-          style={styles.timeInput}
-          onPress={openStartPicker}
+        <div
+          style={{
+            width: "42px",
+            height: "42px",
+            borderRadius: "11px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background:
+              "linear-gradient(135deg, #1764E8, #0B3B9E)",
+            color: "#FFFFFF",
+            fontSize: "25px",
+            fontWeight: "900",
+            marginRight: "12px",
+            boxShadow:
+              "0 5px 18px rgba(0, 92, 255, 0.35)",
+            border:
+              "1px solid rgba(255,255,255,0.20)",
+          }}
         >
-          <Text style={styles.timeIcon}>
-            ◷
-          </Text>
+          N
+        </div>
 
-          <Text
-            style={
-              start
-                ? styles.inputText
-                : styles.placeholder
-            }
+        {/* NOVA */}
+
+        <div
+          style={{
+            fontSize: "21px",
+            fontWeight: "800",
+            letterSpacing: "2px",
+            color: "#FFFFFF",
+          }}
+        >
+          NOVA
+        </div>
+
+        {/* SEPARATOR */}
+
+        <div
+          style={{
+            height: "28px",
+            width: "1px",
+            backgroundColor:
+              "rgba(255,255,255,0.20)",
+            marginLeft: "16px",
+            marginRight: "14px",
+          }}
+        />
+
+        {/* DESCRIPTION */}
+
+        <div
+          style={{
+            color: "#AFC4E8",
+            fontSize: "12px",
+          }}
+        >
+          Gestion des interruptions
+        </div>
+      </div>
+
+      {/* =========================
+          MAIN CONTENT
+      ========================= */}
+
+      <div
+        style={{
+          maxWidth: "850px",
+          margin: "0 auto",
+          padding: "40px 25px",
+          boxSizing: "border-box",
+        }}
+      >
+        {/* HEADER */}
+
+        <div
+          style={{
+            textAlign: "center",
+            marginBottom: "30px",
+          }}
+        >
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "64px",
+              height: "64px",
+              borderRadius: "18px",
+              background:
+                "linear-gradient(135deg, #263b80, #3f5fc4)",
+              color: "#ffffff",
+              fontSize: "25px",
+              fontWeight: "800",
+              marginBottom: "14px",
+              boxShadow:
+                "0 10px 25px rgba(38,59,128,0.25)",
+            }}
           >
-            {start || 'Select start time'}
-          </Text>
-        </TouchableOpacity>
+            N
+          </div>
 
-        <Text style={styles.label}>
-          End Time
-        </Text>
-
-        <TouchableOpacity
-          style={styles.timeInput}
-          onPress={openEndPicker}
-        >
-          <Text style={styles.timeIcon}>
-            ◷
-          </Text>
-
-          <Text
-            style={
-              end
-                ? styles.inputText
-                : styles.placeholder
-            }
+          <h1
+            style={{
+              margin: "0",
+              color: "#172033",
+              fontSize: "32px",
+              fontWeight: "800",
+              letterSpacing: "1px",
+            }}
           >
-            {end || 'Select end time'}
-          </Text>
-        </TouchableOpacity>
+            NOVA
+          </h1>
 
-        <Text style={styles.label}>
-          Area
-        </Text>
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: "#718096",
+              fontSize: "15px",
+            }}
+          >
+            Déclaration d'interruption de service
+          </p>
+        </div>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Enter area"
-          placeholderTextColor="#999999"
-          value={area}
-          onChangeText={setArea}
-        />
+        {/* FORM CARD */}
 
-        <Text style={styles.label}>
-          Department
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Enter department"
-          placeholderTextColor="#999999"
-          value={department}
-          onChangeText={setDepartment}
-        />
-
-        <Text style={styles.label}>
-          Equipment
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Enter equipment"
-          placeholderTextColor="#999999"
-          value={equipment}
-          onChangeText={setEquipment}
-        />
-
-        <Text style={styles.label}>
-          Description
-        </Text>
-
-        <TextInput
-          style={[
-            styles.input,
-            styles.textArea,
-          ]}
-          placeholder="Describe what happened..."
-          placeholderTextColor="#999999"
-          value={description}
-          onChangeText={setDescription}
-          multiline={true}
-        />
-
-        <Text style={styles.label}>
-          Reason
-        </Text>
-
-        <TextInput
-          style={[
-            styles.input,
-            styles.textArea,
-          ]}
-          placeholder="Enter the reason..."
-          placeholderTextColor="#999999"
-          value={reason}
-          onChangeText={setReason}
-          multiline={true}
-        />
-
-        <Text style={styles.label}>
-          Target Hours
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Enter target hours"
-          placeholderTextColor="#999999"
-          value={targetHours}
-          onChangeText={setTargetHours}
-          keyboardType="numeric"
-        />
-
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleSubmit}
+        <div
+          style={{
+            backgroundColor: "#ffffff",
+            borderRadius: "20px",
+            padding: "35px",
+            boxShadow:
+              "0 15px 45px rgba(35, 52, 80, 0.10)",
+            border: "1px solid #e7edf5",
+          }}
         >
-          <Text style={styles.buttonText}>
-            Create Declaration
-          </Text>
-        </TouchableOpacity>
+          {/* SECTION INFORMATIONS */}
 
-        <TouchableOpacity
-          style={styles.viewButton}
-          onPress={loadDeclarations}
-        >
-          <Text style={styles.viewButtonText}>
-            View Declarations
-          </Text>
-        </TouchableOpacity>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              marginBottom: "24px",
+            }}
+          >
+            <div
+              style={{
+                width: "5px",
+                height: "25px",
+                borderRadius: "5px",
+                backgroundColor: "#3f5fc4",
+              }}
+            />
 
-        {message !== '' && (
-          <View style={styles.messageBox}>
-            <Text style={styles.message}>
+            <h2
+              style={{
+                margin: 0,
+                color: "#172033",
+                fontSize: "20px",
+              }}
+            >
+              Informations de l'interruption
+            </h2>
+          </div>
+
+          {/* DATE */}
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Date</label>
+
+            <input
+              type="text"
+              value={date}
+              readOnly
+              style={{
+                ...inputStyle,
+                backgroundColor: "#f1f5f9",
+                color: "#64748b",
+              }}
+            />
+          </div>
+
+          {/* HEURES */}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "18px",
+            }}
+          >
+            <div style={fieldStyle}>
+              <label style={labelStyle}>
+                Heure de début
+              </label>
+
+              <input
+                type="time"
+                value={start}
+                onChange={(e) =>
+                  setStart(e.target.value)
+                }
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={fieldStyle}>
+              <label style={labelStyle}>
+                Heure de fin
+              </label>
+
+              <input
+                type="time"
+                value={end}
+                onChange={(e) =>
+                  setEnd(e.target.value)
+                }
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* DURÉE */}
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              Durée calculée automatiquement
+            </label>
+
+            <div
+              style={{
+                height: "48px",
+                display: "flex",
+                alignItems: "center",
+                padding: "0 15px",
+                borderRadius: "10px",
+                backgroundColor: "#edf2ff",
+                border: "1px solid #d9e2ff",
+                color: "#304da0",
+                fontSize: "16px",
+                fontWeight: "700",
+                boxSizing: "border-box",
+              }}
+            >
+              {targetHours} heure(s)
+            </div>
+          </div>
+
+          {/* SECTION SERVICE */}
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              marginTop: "10px",
+              marginBottom: "24px",
+            }}
+          >
+            <div
+              style={{
+                width: "5px",
+                height: "25px",
+                borderRadius: "5px",
+                backgroundColor: "#3f5fc4",
+              }}
+            />
+
+            <h2
+              style={{
+                margin: 0,
+                color: "#172033",
+                fontSize: "20px",
+              }}
+            >
+              Informations du service
+            </h2>
+          </div>
+
+          {/* AREA */}
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Area</label>
+
+            <input
+              type="text"
+              placeholder="Entrer l'area"
+              value={area}
+              onChange={(e) =>
+                setArea(e.target.value)
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          {/* DEPARTMENT */}
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              Department
+            </label>
+
+            <input
+              type="text"
+              placeholder="Entrer le département"
+              value={department}
+              onChange={(e) =>
+                setDepartment(e.target.value)
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          {/* EQUIPEMENT */}
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              Équipement
+            </label>
+
+            <input
+              type="text"
+              placeholder="Entrer l'équipement"
+              value={equipment}
+              onChange={(e) =>
+                setEquipment(e.target.value)
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          {/* DESCRIPTION */}
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              Description
+            </label>
+
+            <textarea
+              placeholder="Décrire l'interruption..."
+              value={description}
+              onChange={(e) =>
+                setDescription(e.target.value)
+              }
+              rows={4}
+              style={{
+                ...inputStyle,
+                height: "105px",
+                padding: "13px 15px",
+                resize: "vertical",
+              }}
+            />
+          </div>
+
+          {/* REASON */}
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              Reason
+            </label>
+
+            <input
+              type="text"
+              placeholder="Entrer la raison de l'interruption"
+              value={reason}
+              onChange={(e) =>
+                setReason(e.target.value)
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          {/* MESSAGE */}
+
+          {message && (
+            <div
+              style={{
+                padding: "13px 15px",
+                marginBottom: "20px",
+                borderRadius: "10px",
+                backgroundColor:
+                  message.startsWith("✓")
+                    ? "#ecfdf5"
+                    : "#fff1f2",
+                border:
+                  message.startsWith("✓")
+                    ? "1px solid #bbf7d0"
+                    : "1px solid #fecdd3",
+                color:
+                  message.startsWith("✓")
+                    ? "#166534"
+                    : "#be123c",
+                fontWeight: "600",
+                fontSize: "14px",
+              }}
+            >
               {message}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {showDeclarations && (
-        <View style={styles.declarationsContainer}>
-          <Text style={styles.listTitle}>
-            Recent Declarations
-          </Text>
-
-          {declarations.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.noData}>
-                No declarations found.
-              </Text>
-            </View>
-          ) : (
-            declarations.map((item) => (
-              <View
-                key={item.id}
-                style={styles.declarationCard}
-              >
-                <Text style={styles.cardTitle}>
-                  Declaration #{item.id}
-                </Text>
-
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>
-                    Area
-                  </Text>
-
-                  <Text style={styles.infoValue}>
-                    {item.area}
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>
-                    Department
-                  </Text>
-
-                  <Text style={styles.infoValue}>
-                    {item.departement}
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>
-                    Equipment
-                  </Text>
-
-                  <Text style={styles.infoValue}>
-                    {item.equipement}
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>
-                    Time
-                  </Text>
-
-                  <Text style={styles.infoValue}>
-                    {item.start} - {item.end}
-                  </Text>
-                </View>
-
-                <View style={styles.reasonBox}>
-                  <Text style={styles.reasonTitle}>
-                    Reason
-                  </Text>
-
-                  <Text style={styles.reasonText}>
-                    {item.reason}
-                  </Text>
-                </View>
-
-                <Text style={styles.descriptionText}>
-                  {item.description}
-                </Text>
-
-                <Text style={styles.targetValue}>
-                  Target: {item.targetHours} h
-                </Text>
-              </View>
-            ))
+            </div>
           )}
-        </View>
-      )}
 
-      <TimePicker
-        visible={showStartModal}
-        title="Select Start Time"
-        onConfirm={confirmStart}
-        onCancel={() =>
-          setShowStartModal(false)
-        }
-      />
+          {/* BUTTON */}
 
-      <TimePicker
-        visible={showEndModal}
-        title="Select End Time"
-        onConfirm={confirmEnd}
-        onCancel={() =>
-          setShowEndModal(false)
-        }
-      />
-    </ScrollView>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            style={{
+              width: "100%",
+              height: "52px",
+              border: "none",
+              borderRadius: "11px",
+              background:
+                loading
+                  ? "#94a3b8"
+                  : "linear-gradient(135deg, #263b80, #3f5fc4)",
+              color: "#ffffff",
+              fontSize: "16px",
+              fontWeight: "700",
+              cursor:
+                loading
+                  ? "not-allowed"
+                  : "pointer",
+              boxShadow:
+                loading
+                  ? "none"
+                  : "0 8px 20px rgba(38,59,128,0.25)",
+            }}
+          >
+            {loading
+              ? "Enregistrement..."
+              : "Enregistrer déclaration"}
+          </button>
+        </div>
+
+        {/* FOOTER */}
+
+        <p
+          style={{
+            textAlign: "center",
+            marginTop: "20px",
+            color: "#94a3b8",
+            fontSize: "13px",
+          }}
+        >
+          NOVA • Gestion des interruptions
+        </p>
+      </div>
+    </div>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F3F6FA',
-  },
-
-  content: {
-    paddingBottom: 40,
-  },
-
-  header: {
-    backgroundColor: '#0F4C81',
-    paddingTop: 55,
-    paddingBottom: 35,
-    paddingHorizontal: 22,
-  },
-
-  headerSmall: {
-    color: '#D8EAF7',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-
-  title: {
-    color: '#FFFFFF',
-    fontSize: 29,
-    fontWeight: '800',
-  },
-
-  subtitle: {
-    color: '#E5EEF6',
-    fontSize: 14,
-    marginTop: 8,
-  },
-
-  formCard: {
-    backgroundColor: '#FFFFFF',
-    margin: 18,
-    padding: 20,
-    borderRadius: 18,
-    elevation: 4,
-  },
-
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#172033',
-    marginBottom: 10,
-  },
-
-  label: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#344054',
-    marginTop: 16,
-    marginBottom: 7,
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: '#D5DCE5',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 15,
-    color: '#172033',
-    backgroundColor: '#FAFBFC',
-  },
-
-  textArea: {
-    height: 90,
-    textAlignVertical: 'top',
-  },
-
-  timeInput: {
-    borderWidth: 1,
-    borderColor: '#D5DCE5',
-    borderRadius: 10,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FAFBFC',
-  },
-
-  timeIcon: {
-    fontSize: 20,
-    color: '#0F4C81',
-    marginRight: 10,
-  },
-
-  inputText: {
-    color: '#172033',
-    fontSize: 15,
-  },
-
-  placeholder: {
-    color: '#999999',
-    fontSize: 15,
-  },
-
-  button: {
-    backgroundColor: '#0F4C81',
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 25,
-  },
-
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  viewButton: {
-    backgroundColor: '#E6EFF7',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-
-  viewButtonText: {
-    color: '#0F4C81',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  messageBox: {
-    marginTop: 15,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: '#EEF7F0',
-  },
-
-  message: {
-    textAlign: 'center',
-    color: '#217A3A',
-    fontWeight: '600',
-  },
-
-  declarationsContainer: {
-    marginHorizontal: 18,
-    marginTop: 5,
-  },
-
-  listTitle: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: '#172033',
-    marginBottom: 12,
-  },
-
-  emptyCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 25,
-    borderRadius: 15,
-    alignItems: 'center',
-  },
-
-  noData: {
-    color: '#777777',
-  },
-
-  declarationCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 17,
-    borderRadius: 15,
-    marginBottom: 14,
-    elevation: 2,
-  },
-
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#172033',
-    marginBottom: 12,
-  },
-
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-
-  infoLabel: {
-    color: '#777777',
-    fontSize: 13,
-  },
-
-  infoValue: {
-    color: '#172033',
-    fontSize: 13,
-    fontWeight: '700',
-    maxWidth: '60%',
-    textAlign: 'right',
-  },
-
-  reasonBox: {
-    backgroundColor: '#FFF7E5',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 12,
-  },
-
-  reasonTitle: {
-    color: '#8A6200',
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-
-  reasonText: {
-    color: '#5F4A13',
-    fontSize: 14,
-  },
-
-  descriptionText: {
-    color: '#667085',
-    marginTop: 12,
-    fontSize: 13,
-  },
-
-  targetValue: {
-    color: '#0F4C81',
-    fontWeight: '800',
-    marginTop: 12,
-    fontSize: 14,
-  },
-
-  modalBackground: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  modal: {
-    width: '88%',
-    height: '75%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 20,
-  },
-
-  modalTitle: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: '#172033',
-    textAlign: 'center',
-  },
-
-  selectedTime: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#0F4C81',
-    textAlign: 'center',
-    marginVertical: 15,
-  },
-
-  pickerContainer: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-
-  column: {
-    flex: 1,
-    marginHorizontal: 5,
-  },
-
-  columnTitle: {
-    textAlign: 'center',
-    fontWeight: '800',
-    color: '#344054',
-    marginBottom: 6,
-  },
-
-  list: {
-    borderWidth: 1,
-    borderColor: '#D5DCE5',
-    borderRadius: 10,
-  },
-
-  timeItem: {
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-
-  selectedItem: {
-    paddingVertical: 11,
-    alignItems: 'center',
-    backgroundColor: '#E6EFF7',
-  },
-
-  timeText: {
-    color: '#344054',
-    fontSize: 16,
-  },
-
-  selectedTimeText: {
-    color: '#0F4C81',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  confirmButton: {
-    backgroundColor: '#0F4C81',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 15,
-  },
-
-  confirmText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  cancelButton: {
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-
-  cancelText: {
-    color: '#667085',
-    fontSize: 15,
-  },
-});
