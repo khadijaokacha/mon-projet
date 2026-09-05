@@ -1,0 +1,210 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -544,
+        16
+      ],
+      "id": "a6d30ede-c5cf-481b-b1e6-68304b053a13",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  reason,\n  departement,\n  COUNT(*) AS occurrences\nFROM declarations\nWHERE date >= NOW() - INTERVAL 24 HOUR\nGROUP BY reason, departement\nHAVING COUNT(*) >= 2;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -336,
+        16
+      ],
+      "id": "618615f7-4ed1-4f3d-9c21-0aa94cd4cd1f",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "mySql": {
+          "id": "JtWmyfCqdfGEDtHm",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fc53b3ed-8bb3-47f5-88cc-9d79978c36ac",
+              "leftValue": "={{ $json.occurrences }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -112,
+        16
+      ],
+      "id": "deee2565-4415-4d74-a43c-4900db001123",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "salmaokacha1@gmail.com",
+        "subject": "Repeated downtime alert",
+        "emailType": "text",
+        "message": "=🚨 Alerte — Arrêt répétitif détecté\n\nUn même arrêt a été détecté plusieurs fois au cours des dernières 24 heures.\n\nInformations :\n\n- Département : {{ $('Execute a SQL query').first().json.departement }}\n- Raison : {{ $('Execute a SQL query').first().json.reason }}\n- Nombre d'occurrences : {{ $('Execute a SQL query').first().json.occurrences }}\n\nAnalyse et recommandation de l'intelligence artificielle :\n\n{{ $json.output }}\n\nMerci de vérifier ce problème et de prendre les mesures nécessaires afin d'éviter sa répétition.\n\n---\n\nThis email was sent automatically with n8n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        464,
+        -48
+      ],
+      "id": "4e98ee8b-faa2-42b5-8e3d-156e14d91d46",
+      "name": "Send a message",
+      "webhookId": "0ca0fd20-b54c-4dd5-a2b7-21f4e8dfd48a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "vZgxKQ4HzrnvfQOi",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        176,
+        160
+      ],
+      "id": "1d46ac60-05f8-499c-b5c2-1a0fb36282a7",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CY5RqwfFKrfmt9WX",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Voici les données de l'arrêt provenant de la base SQL :\n\nDépartement : {{ $('Execute a SQL query').first().json.departement }}\nRaison : {{ $('Execute a SQL query').first().json.reason }}\nNombre d'occurrences : {{ $('Execute a SQL query').first().json.occurrences }}\n\nSi le nombre d'occurrences est supérieur ou égal à 2, considère qu'il s'agit d'un arrêt répétitif.\n\nDonne :\n- la cause probable\n- une recommandation\n\nSi le nombre d'occurrences est inférieur à 2, indique qu'aucune alerte n'est nécessaire.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        144,
+        -48
+      ],
+      "id": "1f356b23-5aa2-489b-99d4-492fb25c259d",
+      "name": "AI Agent"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6747eb6f-a6c2-4d0e-b2a4-09f383ef951a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b7b5f0e498f5f87fa7a456b6150ba426cd4367711a2b6ea1c1202890a739994b"
+  },
+  "nodeGroups": [],
+  "id": "7UaDYhGzB5CfOeNB",
+  "tags": []
+}
